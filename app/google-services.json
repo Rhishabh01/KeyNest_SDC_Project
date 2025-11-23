@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "972662934042",
+    "project_id": "projectfinal-fa7e1",
+    "storage_bucket": "projectfinal-fa7e1.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:972662934042:android:d27d89447b3bf65c3edfa3",
+        "android_client_info": {
+          "package_name": "com.rhishabh.myapplication"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBa0f1fVMRiIeOtgXvyQ4g3p3AeG0bt6Dk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
