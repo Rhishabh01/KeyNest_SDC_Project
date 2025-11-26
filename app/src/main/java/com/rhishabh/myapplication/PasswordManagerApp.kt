@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Help
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -70,6 +71,9 @@ fun PasswordManagerApp() {
     var authEmail by remember { mutableStateOf("") }
     var authPassword by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
+    var showResetDialog by remember { mutableStateOf(false) }
+    var resetEmail by remember { mutableStateOf("") }
+    var selectedScreen by remember { mutableStateOf("home") }
 
     // Password list
     val passwordsKey = stringPreferencesKey("saved_passwords")
@@ -172,7 +176,14 @@ fun PasswordManagerApp() {
                                     }
                             },
                             modifier = Modifier.width(350.dp)
-                        ) { Text("Login") }
+                        ) {
+                            Text("Login")
+                        }
+
+                        // ---------- FORGOT PASSWORD ----------
+                        TextButton(onClick = { showResetDialog = true }) {
+                            Text("Forgot Password?")
+                        }
 
                         Row(
                             Modifier.fillMaxWidth(),
@@ -181,7 +192,10 @@ fun PasswordManagerApp() {
                             TextButton(onClick = { showLoginScreen = false }) { Text("Create account") }
                             TextButton(onClick = { guestMode = true }) { Text("Continue as Guest") }
                         }
+
                     } else {
+
+                        // ---------- SIGNUP BUTTON ----------
                         Button(
                             onClick = {
                                 if (authEmail.isBlank() || authPassword.isBlank() || confirmPassword.isBlank()) {
@@ -192,6 +206,7 @@ fun PasswordManagerApp() {
                                     Toast.makeText(context, "Passwords do not match", Toast.LENGTH_SHORT).show()
                                     return@Button
                                 }
+
                                 auth.createUserWithEmailAndPassword(authEmail.trim(), authPassword)
                                     .addOnCompleteListener { task ->
                                         if (task.isSuccessful) {
@@ -204,7 +219,9 @@ fun PasswordManagerApp() {
                                     }
                             },
                             modifier = Modifier.width(350.dp)
-                        ) { Text("Sign Up") }
+                        ) {
+                            Text("Sign Up")
+                        }
 
                         Row(
                             Modifier.fillMaxWidth(),
@@ -214,7 +231,53 @@ fun PasswordManagerApp() {
                             TextButton(onClick = { guestMode = true }) { Text("Continue as Guest") }
                         }
                     }
+
                 }
+                if (showResetDialog) {
+                AlertDialog(
+                    onDismissRequest = { showResetDialog = false },
+                    title = { Text("Reset Password") },
+                    text = {
+                        Column {
+                            Text("Enter your email to receive a reset link.")
+                            Spacer(Modifier.height(8.dp))
+
+                            TextField(
+                                value = resetEmail,
+                                onValueChange = { resetEmail = it },
+                                label = { Text("Email") },
+                                singleLine = true
+                            )
+                        }
+                    },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            if (resetEmail.isBlank()) {
+                                Toast.makeText(context, "Enter email", Toast.LENGTH_SHORT).show()
+                                return@TextButton
+                            }
+
+                            auth.sendPasswordResetEmail(resetEmail.trim())
+                                .addOnCompleteListener { task ->
+                                    if (task.isSuccessful) {
+                                        Toast.makeText(context, "Reset link sent", Toast.LENGTH_SHORT).show()
+                                        showResetDialog = false
+                                    } else {
+                                        Toast.makeText(context, task.exception?.message ?: "Error", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                        }) {
+                            Text("Send")
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showResetDialog = false }) {
+                            Text("Cancel")
+                        }
+                    }
+                )
+            }
+
                 // Theme toggle button
                 IconButton(
                     onClick = {
@@ -304,6 +367,16 @@ fun PasswordManagerApp() {
                                         icon = { Icon(Icons.Filled.CloudDownload, contentDescription = "Restore") }
                                     )
 
+                                    NavigationDrawerItem(
+                                        label = { Text("Settings") },
+                                        selected = (selectedScreen == "settings"),
+                                        onClick = {
+                                            selectedScreen = "settings"
+                                            scope.launch { drawerState.close() }
+                                        },
+                                        icon = { Icon(Icons.Filled.Settings, contentDescription = "Settings") }
+                                    )
+
 
 
                                 }
@@ -324,7 +397,7 @@ fun PasswordManagerApp() {
                                     colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
-                                    Icon(Icons.Filled.Logout, contentDescription = "Logout", tint = Color.White)
+                                    Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = "Logout", tint = Color.White)
                                     Spacer(Modifier.width(8.dp))
                                     Text("Logout", color = Color.White)
                                 }
@@ -410,6 +483,7 @@ fun PasswordManagerApp() {
                                 .padding(padding)
                                 .background(MaterialTheme.colorScheme.background)
                         ) {
+
                             // GENERATED PASSWORD TAB
                             when (currentTab) {
                                 "generated" -> {
