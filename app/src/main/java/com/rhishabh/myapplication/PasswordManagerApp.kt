@@ -13,7 +13,6 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Help
-import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -397,7 +396,7 @@ fun PasswordManagerApp() {
                                     colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
-                                    Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = "Logout", tint = Color.White)
+                                    Icon(Icons.Filled.Logout, contentDescription = "Logout", tint = Color.White)
                                     Spacer(Modifier.width(8.dp))
                                     Text("Logout", color = Color.White)
                                 }
