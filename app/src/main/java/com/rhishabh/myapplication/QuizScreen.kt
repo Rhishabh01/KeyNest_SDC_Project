@@ -62,18 +62,6 @@ fun QuizScreen(onClose: () -> Unit) {
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
 
-        TopAppBar(
-            title = { Text("Cybersecurity — Easy Quiz") },
-            actions = {
-                TextButton(onClick = {
-                    selections.clear()
-                    submitted = false
-                    score = 0
-                    onClose()
-                }) { Text("Close") }
-            }
-        )
-
         Spacer(modifier = Modifier.height(12.dp))
         Text("Answer all 5 questions:", style = MaterialTheme.typography.titleMedium)
         Spacer(modifier = Modifier.height(8.dp))

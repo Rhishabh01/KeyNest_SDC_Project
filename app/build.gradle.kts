@@ -10,7 +10,7 @@ plugins {
 
 android {
     namespace = "com.rhishabh.myapplication"
-    compileSdk = 34  // or 35, but 36 is preview-only
+    compileSdk = 36  // or 35, but 36 is preview-only
 
     defaultConfig {
         applicationId = "com.rhishabh.myapplication"
@@ -52,6 +52,7 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation(libs.androidx.appcompat)
+    implementation(libs.androidx.compose.ui.text)
 
     debugImplementation("androidx.compose.ui:ui-tooling")
 

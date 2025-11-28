@@ -35,6 +35,9 @@ import androidx.compose.runtime.mutableIntStateOf
 // Firebase imports
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.EmailAuthProvider
+import com.google.firebase.firestore.FirebaseFirestore
+import com.yourname.passwordmanager.ui.SettingsScreen
+import kotlinx.coroutines.CoroutineScope
 
 val Context.dataStore by preferencesDataStore(name = "settings")
 
@@ -62,7 +65,6 @@ fun PasswordManagerApp() {
 
     // Firebase Auth
     val auth = FirebaseAuth.getInstance()
-
     // Login/signup state
     var isLoggedIn by remember { mutableStateOf(auth.currentUser != null) }
     var guestMode by remember { mutableStateOf(false) }
@@ -77,10 +79,28 @@ fun PasswordManagerApp() {
     // Password list
     val passwordsKey = stringPreferencesKey("saved_passwords")
     val passwordList = remember { mutableStateListOf<PasswordItem>() }
-    LaunchedEffect(Unit) {
-        val raw = context.dataStore.data.map { it[passwordsKey] ?: "[]" }.first()
-        try { passwordList.addAll(Json.decodeFromString(raw)) } catch (_: Exception) {}
+    // Load passwords from Firebase whenever the user logs in
+    LaunchedEffect(isLoggedIn) {
+        if (isLoggedIn && !guestMode) {
+            // Fetch from Firebase
+            val userId = auth.currentUser?.uid
+            if (userId != null) {
+                FirebaseFirestore.getInstance()
+                    .collection("passwords")
+                    .document(userId)
+                    .get()
+                    .addOnSuccessListener { doc ->
+                        val data = doc.getString("items") ?: "[]"
+                        try {
+                            passwordList.clear()
+                            passwordList.addAll(Json.decodeFromString(data))
+                        } catch (_: Exception) {}
+                    }
+            }
+        }
     }
+
+
 
     // Color scheme
     val colorScheme = if (isDarkMode.value) {
@@ -179,17 +199,13 @@ fun PasswordManagerApp() {
                             Text("Login")
                         }
 
-                        // ---------- FORGOT PASSWORD ----------
-                        TextButton(onClick = { showResetDialog = true }) {
-                            Text("Forgot Password?")
-                        }
 
                         Row(
                             Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             TextButton(onClick = { showLoginScreen = false }) { Text("Create account") }
-                            TextButton(onClick = { guestMode = true }) { Text("Continue as Guest") }
+                            TextButton(onClick = { showResetDialog = true }) { Text("Forgot Password?") }
                         }
 
                     } else {
@@ -368,13 +384,16 @@ fun PasswordManagerApp() {
 
                                     NavigationDrawerItem(
                                         label = { Text("Settings") },
-                                        selected = (selectedScreen == "settings"),
+                                        selected = currentTab == "settings",
                                         onClick = {
-                                            selectedScreen = "settings"
+                                            currentTab = "settings"
                                             scope.launch { drawerState.close() }
                                         },
-                                        icon = { Icon(Icons.Filled.Settings, contentDescription = "Settings") }
+                                        icon = { Icon(Icons.Default.Settings, contentDescription = "Settings") },
                                     )
+
+
+
 
 
 
@@ -382,20 +401,27 @@ fun PasswordManagerApp() {
 
                                 Button(
                                     onClick = {
-                                        // Logout (Firebase sign out + local state)
                                         auth.signOut()
                                         isLoggedIn = false
                                         guestMode = false
 
-                                        // Clear all login/signup fields
+                                        // Clear local UI list
+                                        passwordList.clear()
+
+                                        // Clear DataStore
+                                        scope.launch {
+                                            context.dataStore.edit { it[passwordsKey] = "[]" }
+                                        }
+
                                         authEmail = ""
                                         authPassword = ""
                                         confirmPassword = ""
-                                        showLoginScreen = true  // optionally, go back to login screen
+                                        showLoginScreen = true
                                     },
                                     colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
                                     modifier = Modifier.fillMaxWidth()
-                                ) {
+                                )
+                                {
                                     Icon(Icons.Filled.Logout, contentDescription = "Logout", tint = Color.White)
                                     Spacer(Modifier.width(8.dp))
                                     Text("Logout", color = Color.White)
@@ -406,6 +432,7 @@ fun PasswordManagerApp() {
                     }
                 ) {
                     Scaffold(
+
                         floatingActionButton = {
                             if (currentTab == "home") {
                                 FloatingActionButton(
@@ -423,57 +450,83 @@ fun PasswordManagerApp() {
                         },
                         floatingActionButtonPosition = FabPosition.Center,
                         topBar = {
-                            CenterAlignedTopAppBar(
-                                title = {
-                                    OutlinedTextField(
-                                        value = searchQuery,
-                                        onValueChange = { searchQuery = it },
-                                        placeholder = { Text("Search by title or username") },
-                                        leadingIcon = { Icon(Icons.Filled.Search, contentDescription = "Search") },
-                                        singleLine = true,
-                                        modifier = Modifier.fillMaxWidth(),
-                                        shape = RoundedCornerShape(5.dp)
-                                    )
-                                },
-                                navigationIcon = {
-                                    IconButton(onClick = { scopeDrawer.launch { drawerState.open() } }) {
-                                        Icon(Icons.Filled.Menu, contentDescription = "Menu")
-                                    }
-                                },
-                                actions = {
-                                    if (searchQuery.isNotEmpty()) {
-                                        IconButton(onClick = { searchQuery = "" }) {
-                                            Icon(Icons.Filled.Close, contentDescription = "Clear Search")
+
+                            // ✅ Show search bar ONLY in Home tab
+                            if (currentTab == "home") {
+                                CenterAlignedTopAppBar(
+                                    title = {
+                                        OutlinedTextField(
+                                            value = searchQuery,
+                                            onValueChange = { searchQuery = it },
+                                            placeholder = { Text("Search by title or username") },
+                                            leadingIcon = { Icon(Icons.Filled.Search, contentDescription = "Search") },
+                                            singleLine = true,
+                                            modifier = Modifier.fillMaxWidth(),
+                                            shape = RoundedCornerShape(5.dp)
+                                        )
+                                    },
+                                    navigationIcon = {
+                                        IconButton(onClick = { scopeDrawer.launch { drawerState.open() } }) {
+                                            Icon(Icons.Filled.Menu, contentDescription = "Menu")
+                                        }
+                                    },
+                                    actions = {
+                                        if (searchQuery.isNotEmpty()) {
+                                            IconButton(onClick = { searchQuery = "" }) {
+                                                Icon(Icons.Filled.Close, contentDescription = "Clear Search")
+                                            }
                                         }
                                     }
-                                }
-                            )
+                                )
+                            } else {
+                                // ✅ Other tabs will show a clean simple title bar
+                                CenterAlignedTopAppBar(
+                                    title = {
+                                        Text(
+                                            when (currentTab) {
+                                                "generated" -> "Generated Passwords"
+                                                "quiz" -> "Quiz"
+                                                "settings" -> "Settings"
+                                                else -> ""
+                                            }
+                                        )
+                                    },
+                                    navigationIcon = {
+                                        IconButton(onClick = { scopeDrawer.launch { drawerState.open() } }) {
+                                            Icon(Icons.Filled.Menu, contentDescription = "Menu")
+                                        }
+                                    }
+                                )
+                            }
                         },
                         bottomBar = {
-                            NavigationBar {
-                                IconButton(
-                                    onClick = { currentTab = "generated" },
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Icon(Icons.Filled.AutoAwesome, contentDescription = "Generated")
-                                }
-                                IconButton(
-                                    onClick = { currentTab = "home" },
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Icon(Icons.Filled.Home, contentDescription = "Home")
-                                }
-                                IconButton(
-                                    onClick = { currentTab = "quiz" },
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Icon(
-                                        Icons.AutoMirrored.Filled.Help,
-                                        contentDescription = "Quiz"
-                                    )
+                            if (currentTab != "settings") {
+                                NavigationBar {
+                                    IconButton(
+                                        onClick = { currentTab = "generated" },
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Icon(Icons.Filled.AutoAwesome, contentDescription = "Generated")
+                                    }
+                                    IconButton(
+                                        onClick = { currentTab = "home" },
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Icon(Icons.Filled.Home, contentDescription = "Home")
+                                    }
+                                    IconButton(
+                                        onClick = { currentTab = "quiz" },
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Icon(
+                                            Icons.AutoMirrored.Filled.Help,
+                                            contentDescription = "Quiz"
+                                        )
+                                    }
                                 }
                             }
                         }
+
                     ) { padding ->
 
                         Box(
@@ -492,10 +545,7 @@ fun PasswordManagerApp() {
 
                                     Column(Modifier.fillMaxSize().padding(16.dp)) {
 
-                                        Text(
-                                            "Generated Passwords",
-                                            style = MaterialTheme.typography.headlineSmall
-                                        )
+
                                         Spacer(Modifier.height(8.dp))
 
                                         Button(
@@ -607,25 +657,29 @@ fun PasswordManagerApp() {
                                     val filteredList =
                                         if (searchQuery.isBlank()) passwordList
                                         else passwordList.filter {
-                                            it.title.contains(searchQuery, true) ||
-                                                    it.username.contains(searchQuery, true)
+                                            it.title.contains(searchQuery, true) || it.username.contains(searchQuery, true)
                                         }
+
+                                    // Edit dialog state
+                                    var showEditDialog by remember { mutableStateOf(false) }
+                                    var editedItem by remember { mutableStateOf<PasswordItem?>(null) }
+                                    var editedTitle by remember { mutableStateOf("") }
+                                    var editedUsername by remember { mutableStateOf("") }
+                                    var editedPassword by remember { mutableStateOf("") }
 
                                     LazyColumn(Modifier.fillMaxSize().padding(12.dp)) {
                                         itemsIndexed(filteredList) { index, item ->
 
-                                            // Store the confirmation password per item
+                                            // Delete state
                                             var showDelete by remember { mutableStateOf(false) }
                                             var confirm by remember { mutableStateOf("") }
 
                                             Card(
-                                                modifier = Modifier.fillMaxWidth()
-                                                    .padding(vertical = 6.dp),
+                                                modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
                                                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
                                             ) {
                                                 Row(
-                                                    modifier = Modifier.fillMaxWidth()
-                                                        .padding(12.dp),
+                                                    modifier = Modifier.fillMaxWidth().padding(12.dp),
                                                     horizontalArrangement = Arrangement.SpaceBetween,
                                                     verticalAlignment = Alignment.CenterVertically
                                                 ) {
@@ -635,20 +689,30 @@ fun PasswordManagerApp() {
                                                         Text("Password: ${item.password}")
                                                     }
 
-                                                    IconButton(onClick = {
-                                                        // Reset the confirmation password when opening the dialog
-                                                        confirm = ""
-                                                        showDelete = true
-                                                    }) {
-                                                        Icon(
-                                                            Icons.Filled.Delete,
-                                                            contentDescription = "Delete",
-                                                            tint = Color.Red
-                                                        )
+                                                    Row {
+                                                        // Delete button
+                                                        IconButton(onClick = {
+                                                            confirm = ""
+                                                            showDelete = true
+                                                        }) {
+                                                            Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = Color.Red)
+                                                        }
+
+                                                        // Edit button
+                                                        IconButton(onClick = {
+                                                            editedItem = item
+                                                            editedTitle = item.title
+                                                            editedUsername = item.username
+                                                            editedPassword = item.password
+                                                            showEditDialog = true
+                                                        }) {
+                                                            Icon(Icons.Filled.Edit, contentDescription = "Edit")
+                                                        }
                                                     }
                                                 }
                                             }
 
+                                            // DELETE DIALOG
                                             if (showDelete) {
                                                 if (!guestMode) {
                                                     AlertDialog(
@@ -668,28 +732,17 @@ fun PasswordManagerApp() {
                                                         confirmButton = {
                                                             TextButton(onClick = {
                                                                 val user = auth.currentUser
-                                                                if (user?.email == null) {
-                                                                    Toast.makeText(
-                                                                        context,
-                                                                        "No authenticated user",
-                                                                        Toast.LENGTH_SHORT
-                                                                    ).show()
-                                                                    return@TextButton
-                                                                }
-
+                                                                if (user?.email == null) return@TextButton
                                                                 val credential = EmailAuthProvider.getCredential(user.email!!, confirm)
                                                                 user.reauthenticate(credential)
                                                                     .addOnSuccessListener {
-                                                                        // Delete this item
                                                                         passwordList.remove(item)
                                                                         showDelete = false
-
                                                                         scope.launch {
                                                                             context.dataStore.edit {
                                                                                 it[passwordsKey] = Json.encodeToString(passwordList.toList())
                                                                             }
                                                                         }
-
                                                                         Toast.makeText(context, "Deleted", Toast.LENGTH_SHORT).show()
                                                                     }
                                                                     .addOnFailureListener {
@@ -705,6 +758,7 @@ fun PasswordManagerApp() {
                                                     AlertDialog(
                                                         onDismissRequest = { showDelete = false },
                                                         title = { Text("Delete Password?") },
+                                                        text = { Text("Delete this saved password?") },
                                                         confirmButton = {
                                                             TextButton(onClick = {
                                                                 passwordList.remove(item)
@@ -718,17 +772,66 @@ fun PasswordManagerApp() {
                                                         },
                                                         dismissButton = {
                                                             TextButton(onClick = { showDelete = false }) { Text("No") }
-                                                        },
-                                                        text = { Text("Delete this saved password?") }
+                                                        }
                                                     )
                                                 }
                                             }
                                         }
                                     }
 
+                                    // EDIT DIALOG
+                                    if (showEditDialog && editedItem != null) {
+                                        AlertDialog(
+                                            onDismissRequest = { showEditDialog = false },
+                                            title = { Text("Edit Password") },
+                                            text = {
+                                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                    OutlinedTextField(
+                                                        value = editedTitle,
+                                                        onValueChange = { editedTitle = it },
+                                                        label = { Text("Title / App") }
+                                                    )
+                                                    OutlinedTextField(
+                                                        value = editedUsername,
+                                                        onValueChange = { editedUsername = it },
+                                                        label = { Text("Username") }
+                                                    )
+                                                    OutlinedTextField(
+                                                        value = editedPassword,
+                                                        onValueChange = { editedPassword = it },
+                                                        label = { Text("Password") }
+                                                    )
+                                                }
+                                            },
+                                            confirmButton = {
+                                                TextButton(onClick = {
+                                                    editedItem?.let { oldItem ->
+                                                        val index = passwordList.indexOf(oldItem)
+                                                        if (index != -1) {
+                                                            passwordList[index] = PasswordItem(
+                                                                title = editedTitle,
+                                                                username = editedUsername,
+                                                                password = editedPassword
+                                                            )
+                                                            scope.launch {
+                                                                context.dataStore.edit {
+                                                                    it[passwordsKey] = Json.encodeToString(passwordList.toList())
+                                                                }
+                                                            }
+                                                        }
+                                                        showEditDialog = false
+                                                        editedItem = null
+                                                    }
+                                                }) { Text("Save") }
+                                            },
+                                            dismissButton = {
+                                                TextButton(onClick = { showEditDialog = false }) { Text("Cancel") }
+                                            }
+                                        )
+                                    }
 
+                                    // ADD NEW PASSWORD DIALOG (existing code)
                                     if (showDialog) {
-
                                         var title by remember { mutableStateOf("") }
                                         var username by remember { mutableStateOf("") }
                                         var password by remember { mutableStateOf("") }
@@ -738,7 +841,6 @@ fun PasswordManagerApp() {
                                             onDismissRequest = { showDialog = false },
                                             title = { Text("Add New Password") },
                                             text = {
-
                                                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                                     OutlinedTextField(
                                                         value = title,
@@ -758,40 +860,23 @@ fun PasswordManagerApp() {
                                                         horizontalArrangement = Arrangement.SpaceBetween,
                                                         verticalAlignment = Alignment.CenterVertically
                                                     ) {
-
                                                         Button(onClick = {
                                                             val newP = generateRandomPassword()
                                                             password = newP
                                                             lastGenerated = newP
                                                         }) {
-                                                            Icon(
-                                                                Icons.Filled.AutoAwesome,
-                                                                contentDescription = "Generate"
-                                                            )
+                                                            Icon(Icons.Filled.AutoAwesome, contentDescription = "Generate")
                                                             Spacer(Modifier.width(6.dp))
                                                             Text("Generate")
                                                         }
 
                                                         if (lastGenerated.isNotBlank()) {
                                                             Button(onClick = {
-                                                                val clipboard =
-                                                                    context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                                                clipboard.setPrimaryClip(
-                                                                    ClipData.newPlainText(
-                                                                        "Password",
-                                                                        lastGenerated
-                                                                    )
-                                                                )
-                                                                Toast.makeText(
-                                                                    context,
-                                                                    "Copied",
-                                                                    Toast.LENGTH_SHORT
-                                                                ).show()
+                                                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                                                clipboard.setPrimaryClip(ClipData.newPlainText("Password", lastGenerated))
+                                                                Toast.makeText(context, "Copied", Toast.LENGTH_SHORT).show()
                                                             }) {
-                                                                Icon(
-                                                                    Icons.Filled.ContentCopy,
-                                                                    contentDescription = "Copy"
-                                                                )
+                                                                Icon(Icons.Filled.ContentCopy, contentDescription = "Copy")
                                                                 Spacer(Modifier.width(6.dp))
                                                                 Text("Copy")
                                                             }
@@ -801,50 +886,48 @@ fun PasswordManagerApp() {
                                             },
                                             confirmButton = {
                                                 TextButton(onClick = {
-
                                                     if (title.isNotBlank() && username.isNotBlank() && password.isNotBlank()) {
-                                                        val newItem =
-                                                            PasswordItem(title, username, password)
-                                                        passwordList.add(newItem)
+                                                        passwordList.add(PasswordItem(title, username, password))
                                                         showDialog = false
-
                                                         scope.launch {
                                                             context.dataStore.edit {
-                                                                it[passwordsKey] =
-                                                                    Json.encodeToString(passwordList.toList())
+                                                                it[passwordsKey] = Json.encodeToString(passwordList.toList())
                                                             }
                                                         }
-
-                                                        Toast.makeText(
-                                                            context,
-                                                            "Password added",
-                                                            Toast.LENGTH_SHORT
-                                                        ).show()
-
+                                                        Toast.makeText(context, "Password added", Toast.LENGTH_SHORT).show()
                                                     } else {
-                                                        Toast.makeText(
-                                                            context,
-                                                            "Fill all fields",
-                                                            Toast.LENGTH_SHORT
-                                                        ).show()
+                                                        Toast.makeText(context, "Fill all fields", Toast.LENGTH_SHORT).show()
                                                     }
-
                                                 }) { Text("Save") }
                                             },
                                             dismissButton = {
-                                                TextButton(onClick = { showDialog = false }) {
-                                                    Text(
-                                                        "Cancel"
-                                                    )
-                                                }
+                                                TextButton(onClick = { showDialog = false }) { Text("Cancel") }
                                             }
                                         )
                                     }
                                 }
+
                                 // QUIZ TAB
                                 "quiz" -> {
                                     QuizScreen(onClose = { currentTab = "home" })
                                 }
+
+                                "settings" -> {
+                                    SettingsScreen(
+                                        onDestroyPasswords = {
+                                            passwordList.clear()
+                                            scope.launch {
+                                                context.dataStore.edit { it[passwordsKey] = "[]" }
+                                            }
+                                            Toast.makeText(context, "All passwords cleared", Toast.LENGTH_SHORT).show()
+                                        },
+                                        onBack = {
+                                            currentTab = "home"
+                                        }
+                                    )
+                                }
+
+
                             }
                         }
                     }
@@ -852,3 +935,85 @@ fun PasswordManagerApp() {
             }
         }
     }
+
+// ---------------------------
+// BACKUP MANAGER
+// ---------------------------
+object BackupManager {
+
+    fun backupPasswords(
+        context: Context,
+        list: List<PasswordItem>,
+        scope: CoroutineScope
+    ) {
+        scope.launch {
+            try {
+                // If no passwords, don't backup
+                if (list.isEmpty()) {
+                    return@launch
+                }
+
+                val json = Json.encodeToString(list)
+                val file = context.getFileStreamPath("password_backup.json")
+
+                file.writeText(json)
+
+                Toast.makeText(context, "Backup updated", Toast.LENGTH_SHORT).show()
+
+            } catch (e: Exception) {
+                Toast.makeText(context, "Backup failed: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+
+    fun restorePasswords(
+        context: Context,
+        list: MutableList<PasswordItem>,
+        scope: CoroutineScope
+    ) {
+        scope.launch {
+            try {
+                val file = context.getFileStreamPath("password_backup.json")
+
+                // No file → no backup
+                if (!file.exists()) {
+                    Toast.makeText(context, "No backup found", Toast.LENGTH_SHORT).show()
+                    return@launch
+                }
+
+                val json = file.readText()
+
+                // Empty file → treat it as no backup
+                if (json.isBlank() || json.trim() == "[]") {
+                    Toast.makeText(context, "Backup is empty", Toast.LENGTH_SHORT).show()
+                    return@launch
+                }
+
+                // Try to decode, if fails → treat as corrupted
+                val restored = try {
+                    Json.decodeFromString<List<PasswordItem>>(json)
+                } catch (e: Exception) {
+                    Toast.makeText(context, "Backup corrupted", Toast.LENGTH_SHORT).show()
+                    return@launch
+                }
+
+                list.clear()
+                list.addAll(restored)
+
+                // Update DataStore
+                val key = stringPreferencesKey("saved_passwords")
+                context.dataStore.edit {
+                    it[key] = Json.encodeToString(restored)
+                }
+
+                Toast.makeText(context, "Passwords restored", Toast.LENGTH_SHORT).show()
+
+            } catch (e: Exception) {
+                Toast.makeText(context, "Restore failed: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+}
+
+
