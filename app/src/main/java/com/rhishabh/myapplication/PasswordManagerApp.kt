@@ -545,10 +545,7 @@ fun PasswordManagerApp() {
 
                                     Column(Modifier.fillMaxSize().padding(16.dp)) {
 
-                                        Text(
-                                            "Generated Passwords",
-                                            style = MaterialTheme.typography.headlineSmall
-                                        )
+
                                         Spacer(Modifier.height(8.dp))
 
                                         Button(
