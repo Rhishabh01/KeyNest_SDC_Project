@@ -46,23 +46,6 @@ fun SettingsScreen(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
 
-        // Delete all passwords (local + cloud)
-        Card(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-            shape = RoundedCornerShape(12.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text("Destroy All Saved Passwords")
-                IconButton(onClick = { onDestroyPasswords() }) {
-                    Icon(Icons.Filled.Delete, contentDescription = "Destroy Passwords")
-                }
-            }
-        }
 
         // Change Password
         Card(
