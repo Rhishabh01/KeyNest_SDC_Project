@@ -243,7 +243,6 @@ fun PasswordManagerApp() {
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             TextButton(onClick = { showLoginScreen = true }) { Text("Back to Login") }
-                            TextButton(onClick = { guestMode = true }) { Text("Continue as Guest") }
                         }
                     }
 
@@ -998,7 +997,7 @@ object BackupManager {
                     return@launch
                 }
 
-                list.clear()
+
                 list.addAll(restored)
 
                 // Update DataStore
