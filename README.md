@@ -3,6 +3,6 @@
 Features:
 - Login UI (With forgot password and authentication)
 - Saved Passwords
+- Encrypted 
 - Generated Passwords
 - Quiz
-
