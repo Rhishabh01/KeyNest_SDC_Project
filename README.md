@@ -6,3 +6,11 @@ Features:
 - Encrypted 
 - Generated Passwords
 - Quiz
+  
+
+  #Authors Are:
+
+  **P.R.Reshabh,**
+  **CH.shiva sathawik,**
+  **Devatade Bhanu Charan**
+  
